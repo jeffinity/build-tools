@@ -94,5 +94,3 @@ tasks:
     cmds:
       - cmd: echo {{.TOOLS_DIR}}/scripts/build_app_image.sh {{.CLI_ARGS}} --os linux --arch amd64
         silent: true
-      - cmd: bash {{.TOOLS_DIR}}/scripts/build_app_image.sh {{.CLI_ARGS}} --os linux --arch amd64
-        silent: true
