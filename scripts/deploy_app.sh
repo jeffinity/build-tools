@@ -12,11 +12,33 @@ SCRIPT_DIR="$(cd -P -- "$(dirname -- "$SOURCE")" >/dev/null 2>&1 && pwd)"
 
 . "$SCRIPT_DIR/gum_helper.sh"
 
-OS=${1:-}; ARCH=${2:-}; APP_RAW=${3:-}; RHOSTS=${4:-};
+OS=${1:-}
+ARCH=${2:-}
+ARG3=${3:-}
+ARG4=${4:-}
+
+APP_RAW=""
+RHOSTS=""
+
+if [[ -z "$OS" || -z "$ARCH" ]]; then
+  echo_color "Usage: $0 <os> <arch> [app] <rhost(s)>" red
+  exit 1
+fi
+
+if [[ -n "$ARG4" ]]; then
+  # mono-repo style: deploy_app.sh <os> <arch> <app> <hosts>
+  APP_RAW="$ARG3"
+  RHOSTS="$ARG4"
+else
+  # single-repo style: deploy_app.sh <os> <arch> <hosts>
+  RHOSTS="$ARG3"
+  APP_RAW="$(basename "$(pwd -P)")"
+fi
+
 APP=${APP_RAW##*/}
 
-if [[ -z $APP || -z $OS || -z $ARCH || -z $RHOSTS ]]; then
-  echo_color "Usage: $0 <os> <arch> <app> <rhost(s)>" red
+if [[ -z "$APP" || -z "$RHOSTS" ]]; then
+  echo_color "Usage: $0 <os> <arch> [app] <rhost(s)>" red
   exit 1
 fi
 

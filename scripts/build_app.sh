@@ -18,17 +18,29 @@ root_dir=$(pwd)
 
 # Build metadata
 BUILD_TIME=$(date '+%F %T')
-GIT_COMMIT=$(git rev-parse --short HEAD)
+GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 MODULE_PATH=$(go list -m | head -n 1)
 BUILD_USER=$(id -un)
 GO_VERSION=$(go version | awk '{print $3}')
 
 # CLI args
-os=$1
-arch=$2
-version=$3
-selected=$4
-opts=("${@:5}")
+os=${1:-}
+arch=${2:-}
+version=${3:-}
+
+raw_selected=${4:-}
+if [[ -n "$raw_selected" && "$raw_selected" == -* ]]; then
+  selected=""
+  opts=("${@:4}")
+else
+  selected="$raw_selected"
+  opts=("${@:5}")
+fi
+
+if [[ -z "$os" || -z "$arch" ]]; then
+  echo_color "Usage: $0 <os> <arch> [version] [selected app|all] [other opts...]" red
+  exit 1
+fi
 
 if [ -z "$version" ]; then
   version=$(git describe --abbrev=0 --tags 2>/dev/null || echo "v0.0.1")
@@ -59,6 +71,11 @@ checksum_cmd() {
 calculate_checksum() {
   local dir=$1
   local sum_cmd=$(checksum_cmd)
+
+  if [[ ! -d "$dir" ]]; then
+    echo ""
+    return 0
+  fi
 
   find "$dir" -name "*.go" -exec $sum_cmd {} \; | $sum_cmd | cut -d ' ' -f 1
 }
@@ -134,22 +151,68 @@ checksum_build() {
   fi
 }
 
-# Dispatch: build one or all
-if [[ "$selected" == "all" ]]; then
-  for dir in app/*; do
-    [[ -d $dir ]] || continue
-    if [[ " ${opts[*]} " == *" -f "* ]]; then
-      echo_color "Force build mode" yellow
-      build_app "$dir"
-    else
-      checksum_build "$dir"
-    fi
-  done
-else
+build_with_mode() {
+  local target=$1
   if [[ " ${opts[*]} " == *" -f "* ]]; then
     echo_color "Force build mode" yellow
-    build_app "$selected"
+    build_app "$target"
   else
-    checksum_build "$selected"
+    checksum_build "$target"
   fi
+}
+
+normalize_mono_target() {
+  local raw=$1
+  if [[ -z "$raw" || "$raw" == "all" ]]; then
+    echo "all"
+    return 0
+  fi
+  if [[ -d "$raw" ]]; then
+    echo "$raw"
+    return 0
+  fi
+  if [[ -d "app/$raw" ]]; then
+    echo "app/$raw"
+    return 0
+  fi
+  return 1
+}
+
+mono_repo_mode() {
+  local target
+  if ! target=$(normalize_mono_target "$selected"); then
+    echo_color "Error: App directory '${selected}' does not exist (expected app/<name> or full path)" red
+    exit 1
+  fi
+
+  if [[ "$target" == "all" ]]; then
+    local found=false
+    for dir in app/*; do
+      [[ -d $dir ]] || continue
+      found=true
+      build_with_mode "$dir"
+    done
+    if [[ "$found" == false ]]; then
+      echo_color "Error: no app directories found under app/" red
+      exit 1
+    fi
+    return 0
+  fi
+
+  build_with_mode "$target"
+}
+
+single_repo_mode() {
+  if [[ -n "$selected" && "$selected" != "all" && "$selected" != "." && "$selected" != "$(basename "$root_dir")" ]]; then
+    echo_color "Warning: single-repo mode ignores selected target '${selected}', building root cmd/ directly" yellow
+  fi
+
+  build_with_mode "$root_dir"
+}
+
+# Dispatch: auto detect mono/single repo mode
+if [[ -d "$root_dir/app" ]]; then
+  mono_repo_mode
+else
+  single_repo_mode
 fi

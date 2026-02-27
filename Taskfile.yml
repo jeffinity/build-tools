@@ -2,6 +2,7 @@
 version: '3'
 
 vars:
+  TOOLS_DIR: 'third_party/build-tools'
   MODULE_NAME: { sh: go list -m | head -n 1 }
   LOCAL_OS: { sh:  go env GOOS }
   LOCAL_ARCH: { sh:  go env GOARCH }

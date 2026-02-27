@@ -51,9 +51,21 @@ for path in "${unique_paths[@]}"; do
       exit 0
     fi
 
+    gomod_file="$(go env GOMOD 2>/dev/null || true)"
+    if [[ -z "$gomod_file" || "$gomod_file" == "/dev/null" ]]; then
+      echo_color "✖ Error: 无法定位 go.mod，请在 Go 模块内执行 task conf" red
+      exit 1
+    fi
+    module_root="$(dirname "$gomod_file")"
+    third_party_dir="${module_root}/third_party"
+    if [[ ! -d "$third_party_dir" ]]; then
+      echo_color "✖ Error: third_party 目录不存在: $third_party_dir" red
+      exit 1
+    fi
+
     protoc \
       --proto_path=. \
-      --proto_path=../../../../third_party \
+      --proto_path="$third_party_dir" \
       --go_out=paths=source_relative:. \
       "${proto_files[@]}"
   )

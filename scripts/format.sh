@@ -30,13 +30,10 @@ find_tool() {
   fi
 }
 
+SELECTED_APP="${1:-.}"
 if [ $# -lt 1 ]; then
-  echo_color "✖ No target specified. Please provide a directory or 'all'." red
-  echo_color "Usage: bash format.sh <directory or 'all'>" yellow
-  exit 1
+  echo_color "No target specified, default to current directory '.'" yellow
 fi
-
-SELECTED_APP="$1"
 
 if ! MODULE_NAME=$(go list -m | head -n 1 2>/dev/null); then
   echo_color "✖ Unable to retrieve module name. Run this at the root of a Go module." red

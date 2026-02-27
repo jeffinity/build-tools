@@ -13,31 +13,62 @@ SCRIPT_DIR="$(cd -P -- "$(dirname -- "$SOURCE")" >/dev/null 2>&1 && pwd)"
 
 selected=${1:-}
 
-# Pre-check: must specify at least one app
-if [[ -z "$selected" ]]; then
-  echo_color "✖ Error: Please specify at least one app" red
-  exit 1
-fi
-
 # wire_gen: cd into $1, run wire, report success
 wire_gen() {
   local path=$1
-  cd "$path" || { echo_color "✖ Error: Cannot enter directory $path" red; exit 1; }
+  pushd "$path" >/dev/null || { echo_color "✖ Error: Cannot enter directory $path" red; exit 1; }
   wire ./... && echo_color "✔ Gen $path wire success." green
-  cd -
+  popd >/dev/null
 }
 
-if [[ "$selected" == "all" ]]; then
-  # run wire_gen on every sub-dir under app/
-  for path in app/*; do
-    [[ -d "$path" ]] || continue
-    wire_gen "$path"
-  done
-else
-  # Pre-check: the given directory must exist
-  if [[ ! -d "$selected" ]]; then
-    echo_color "✖ Error: App directory $selected does not exist" red
+normalize_mono_target() {
+  local raw=$1
+  if [[ -z "$raw" || "$raw" == "all" ]]; then
+    echo "all"
+    return 0
+  fi
+  if [[ -d "$raw" ]]; then
+    echo "$raw"
+    return 0
+  fi
+  if [[ -d "app/$raw" ]]; then
+    echo "app/$raw"
+    return 0
+  fi
+  return 1
+}
+
+if [[ -d "app" ]]; then
+  target=""
+  if ! target=$(normalize_mono_target "$selected"); then
+    echo_color "✖ Error: App directory '$selected' does not exist (expected app/<name> or full path)" red
     exit 1
   fi
-  wire_gen "$selected"
+
+  if [[ "$target" == "all" ]]; then
+    found=false
+    for path in app/*; do
+      [[ -d "$path" ]] || continue
+      found=true
+      wire_gen "$path"
+    done
+    if [[ "$found" == false ]]; then
+      echo_color "✖ Error: no app directories found under app/" red
+      exit 1
+    fi
+  else
+    wire_gen "$target"
+  fi
+else
+  # single-repo mode: default current repo root
+  target="."
+  if [[ -n "$selected" && "$selected" != "." && "$selected" != "all" ]]; then
+    if [[ -d "$selected" ]]; then
+      target="$selected"
+    else
+      echo_color "✖ Error: directory '$selected' does not exist" red
+      exit 1
+    fi
+  fi
+  wire_gen "$target"
 fi
