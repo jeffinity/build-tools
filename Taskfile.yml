@@ -1,0 +1,98 @@
+# go install github.com/go-task/task/v3/cmd/task@latest
+version: '3'
+
+vars:
+  MODULE_NAME: { sh: go list -m | head -n 1 }
+  LOCAL_OS: { sh:  go env GOOS }
+  LOCAL_ARCH: { sh:  go env GOARCH }
+
+env:
+  BUILD_ROOT:
+    sh: 'printf "%s" "${LOCAL_BUILD_ROOT:-}"'
+
+tasks:
+  check:
+    desc: Env check
+    cmds:
+      - cmd: bash {{.TOOLS_DIR}}/scripts/tools_check.sh
+        silent: true
+
+  format:
+    desc: Format *go code
+    cmds:
+      - cmd: bash {{.TOOLS_DIR}}/scripts/format.sh all
+        silent: true
+
+  format-app:
+    desc: Format {app}/*go code
+    cmds:
+      - cmd: bash {{.TOOLS_DIR}}/scripts/format.sh {{.CLI_ARGS}}
+        silent: true
+
+  lint:
+    desc: Lint all code
+    cmds:
+      - cmd: bash {{.TOOLS_DIR}}/scripts/lint.sh
+        silent: true
+
+  conf:
+    desc: Gen {app}/internal/conf/*.proto
+    cmds:
+      - cmd: bash {{.TOOLS_DIR}}/scripts/build_config.sh {{.CLI_ARGS}}
+        silent: true
+
+  wire:
+    desc: wire gen selected {app}
+    cmds:
+      - cmd: bash {{.TOOLS_DIR}}/scripts/wire_gen.sh {{.CLI_ARGS}}
+        silent: true
+      - cmd: task format-app -- {{.CLI_ARGS}}
+        silent: true
+
+  wire-all:
+    desc: wire gen all app
+    cmds:
+      - cmd: bash {{.TOOLS_DIR}}/scripts/wire_gen.sh all
+        silent: true
+      - cmd: task format
+        silent: true
+
+  build:
+    desc: build app for the native platform
+    cmds:
+      - cmd: bash {{.TOOLS_DIR}}/scripts/build_app.sh {{.LOCAL_OS}} {{.LOCAL_ARCH}} '' {{.CLI_ARGS}}
+        silent: true
+
+  build-linux-amd64:
+    desc: build app for the linux-amd64
+    cmds:
+      - cmd: bash {{.TOOLS_DIR}}/scripts/build_app.sh linux amd64 '' {{.CLI_ARGS}}
+        silent: true
+  
+  build-linux-arm64:
+    desc: build app for the linux-arm64
+    cmds:
+      - cmd: bash {{.TOOLS_DIR}}/scripts/build_app.sh linux arm64 '' {{.CLI_ARGS}}
+        silent: true
+
+  deploy:
+    desc: build app to the server
+    cmds:
+      - cmd: task build-linux-amd64 -- {{.CLI_ARGS}}
+        silent: true
+      - cmd: AUTO_RESTART=true {{.TOOLS_DIR}}/scripts/deploy_app.sh linux amd64 {{.CLI_ARGS}}
+        silent: true
+
+  newapp:
+    desc: create new app with app_layout
+    cmds:
+      - cmd: bash {{.TOOLS_DIR}}/scripts/newapp.sh {{ .MODULE_NAME }} {{.CLI_ARGS}}
+        silent: true
+
+  image-linux-amd64:
+    desc: build app image for the linux-amd64, e.g. task image-linux-amd64 -- app/probe_center v1.0.0 [-p/--push]
+    cmds:
+      - cmd: echo {{.TOOLS_DIR}}/scripts/build_app_image.sh {{.CLI_ARGS}} --os linux --arch amd64
+        silent: true
+      - cmd: bash {{.TOOLS_DIR}}/scripts/build_app_image.sh {{.CLI_ARGS}} --os linux --arch amd64
+        silent: true
