@@ -79,9 +79,7 @@ tasks:
   deploy:
     desc: build app to the server
     cmds:
-      - cmd: task build-linux-amd64 -- {{.CLI_ARGS}}
-        silent: true
-      - cmd: AUTO_RESTART=true {{.TOOLS_DIR}}/scripts/deploy_app.sh linux amd64 {{.CLI_ARGS}}
+      - cmd: AUTO_RESTART=true bash {{.TOOLS_DIR}}/scripts/deploy_with_build.sh linux amd64 {{.CLI_ARGS}}
         silent: true
 
   newapp:
