@@ -27,6 +27,7 @@ packages=(
     [golangci-lint]="github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.4"
     [golines]="github.com/segmentio/golines@v0.13.0"
 )
+MPROCS_VERSION="v0.9.2"
 
 if [[ "${OS:-}" == "Windows_NT" ]]; then
   if [[ -n "${BUILD_ROOT:-}" ]]; then
@@ -69,12 +70,70 @@ install_package() {
     go install "$package_path"
 }
 
+install_mprocs() {
+    local os arch filename url tmp_dir archive_path extracted_bin
+    os=$(go env GOOS)
+    arch=$(go env GOARCH)
+
+    case "${os}/${arch}" in
+        darwin/arm64)
+            filename="mprocs-${MPROCS_VERSION#v}-darwin-aarch64.tar.gz"
+            ;;
+        darwin/amd64)
+            filename="mprocs-${MPROCS_VERSION#v}-darwin-x86_64.tar.gz"
+            ;;
+        linux/arm64)
+            filename="mprocs-${MPROCS_VERSION#v}-linux-aarch64-musl.tar.gz"
+            ;;
+        linux/amd64)
+            filename="mprocs-${MPROCS_VERSION#v}-linux-x86_64-musl.tar.gz"
+            ;;
+        windows/amd64)
+            filename="mprocs-${MPROCS_VERSION#v}-windows-x86_64.zip"
+            ;;
+        *)
+            echo "Unsupported architecture: ${os}:${arch}, Please try to manually install mprocs to the .build/.bin"
+            exit 1
+            ;;
+    esac
+
+    url="https://github.com/pvolok/mprocs/releases/download/${MPROCS_VERSION}/${filename}"
+    tmp_dir="/tmp/mprocs"
+    archive_path="${tmp_dir}/${filename}"
+
+    rm -rf "$tmp_dir"
+    mkdir -p "$tmp_dir"
+
+    echo "download mprocs from $url to $archive_path"
+    curl -L "$url" -o "$archive_path"
+
+    if [[ "$os" == "windows" ]]; then
+        unzip -q "$archive_path" -d "$tmp_dir"
+        extracted_bin=$(find "$tmp_dir" -type f -name "mprocs.exe" | head -n 1)
+        [[ -n "$extracted_bin" ]] || { echo "mprocs.exe not found in archive"; exit 1; }
+        mv "$extracted_bin" "$GOBIN/mprocs.exe"
+    else
+        tar -xzf "$archive_path" -C "$tmp_dir"
+        extracted_bin=$(find "$tmp_dir" -type f -name "mprocs" | head -n 1)
+        [[ -n "$extracted_bin" ]] || { echo "mprocs not found in archive"; exit 1; }
+        mv "$extracted_bin" "$GOBIN/mprocs"
+        chmod +x "$GOBIN/mprocs"
+    fi
+
+    rm -rf "$tmp_dir"
+}
+
 for binary in "${!packages[@]}"; do
     if ! check_binary "$binary"; then
         echo_color "⇊ $binary does not exist, installing..." yellow
         install_package "${packages[$binary]}"
     fi
 done
+
+if ! check_binary "mprocs"; then
+    echo_color "⇊ mprocs does not exist, installing..." yellow
+    install_mprocs
+fi
 
 if ! check_binary "protoc"; then
 
